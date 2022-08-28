@@ -180,13 +180,24 @@ class Growing:
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
-        icon_path = ':/plugins/Growing/icon.png'
-        self.add_action(
-            icon_path,
-            text=self.tr(u''),
-            callback=self.run,
-            parent=self.iface.mainWindow())
+        # icon_path = ':/plugins/Growing/icons/main_icon.png'
+        # self.add_action(
+        #     icon_path,
+        #     text=self.tr(u''),
+        #     callback=self.run,
+        #     parent=self.iface.mainWindow())
 
+    #--------------------------------------
+
+        self.action = QAction(
+            QIcon(":/Growing/icons/main_icon.png"),
+            u"Growing",
+            self.iface.mainWindow(),
+        )
+        self.action.triggered.connect(self.run)
+        self.iface.addToolBarIcon(self.action)
+        self.iface.addPluginToMenu(u"&Growing", self.action)
+    #--------------------------------------
         # will be set False in run()
         self.first_start = True
 
