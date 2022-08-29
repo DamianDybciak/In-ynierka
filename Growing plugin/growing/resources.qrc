@@ -1,5 +1,10 @@
 <RCC>
-    <qresource prefix="/plugins/Growing" >
-        <file>icon.png</file>
+    <qresource prefix="growing" >
+        <file>/icons/main_icon.png</file>
+        <file>/icons/download.png</file>
+		<file>/icons/user_login.png</file>
+		<file>/icons/calendar.png</file>
+        
+    
     </qresource>
 </RCC>
