@@ -1,0 +1,17 @@
+[general]
+name= Growing
+internal_name = growing
+qgisMinimumVersion=3.16
+qgisMaximumVersion=3.99
+description= Plugin for download MODIS images.
+about= This plugin allows downloads and visualization MODIS data in Qgis.
+version= 1.0
+author= Damian Dybciak
+email= 
+icon=icons/main_icon.png
+tags=images,local,cefpython, MODIS,landscape, download, visualization
+homepage=https://github.com/DamianDybciak/Modis-data-representation-plugin
+tracker=https://github.com/DamianDybciak/Modis-data-representation-plugin/issues
+repository=https://github.com/DamianDybciak/Modis-data-representation-plugin
+experimental=False
+deprecated=False
