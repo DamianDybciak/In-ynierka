@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>701</width>
+    <width>735</width>
     <height>619</height>
    </rect>
   </property>
@@ -23,7 +23,7 @@
      </widget>
     </item>
     <item>
-     <widget class="QTabWidget" name="das">
+     <widget class="QTabWidget" name="widgets">
       <property name="enabled">
        <bool>true</bool>
       </property>
@@ -95,9 +95,9 @@
        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>3</number>
       </property>
-      <widget class="download" name="tab">
+      <widget class="QWidget" name="tab">
        <attribute name="title">
         <string>Logowanie</string>
        </attribute>
@@ -254,7 +254,7 @@
         </property>
        </widget>
       </widget>
-      <widget class="download" name="widget">
+      <widget class="QWidget" name="widget">
        <attribute name="title">
         <string>Obszar </string>
        </attribute>
@@ -854,7 +854,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>701</width>
+     <width>735</width>
      <height>21</height>
     </rect>
    </property>
@@ -871,12 +871,6 @@
    <class>QgsPasswordLineEdit</class>
    <extends>QLineEdit</extends>
    <header>qgspasswordlineedit.h</header>
-  </customwidget>
-  <customwidget>
-   <class>download</class>
-   <extends>QWidget</extends>
-   <header location="global">download</header>
-   <container>1</container>
   </customwidget>
  </customwidgets>
  <resources/>

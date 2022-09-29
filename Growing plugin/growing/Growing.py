@@ -71,6 +71,12 @@ class Growing:
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
 
+
+        # ===========================\
+        self.savePassword = None
+        self.saveLogin = None
+        self.login_variables = QSettings('Growing plugin ', 'Variables')
+
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
         """Get the translation for a string using Qt translation API.
@@ -187,10 +193,11 @@ class Growing:
         #     callback=self.run,
         #     parent=self.iface.mainWindow())
 
-    #--------------------------------------
+    #---------------------------------  -----
 
+        self.toolbar = self.iface.addToolBar(u'Growing toolbar')
         self.action = QAction(
-            QIcon(":/Growing/icons/main_icon.png"),
+            QIcon(":/growing/icons/main_icon.png"),
             u"Growing",
             self.iface.mainWindow(),
         )
@@ -200,6 +207,93 @@ class Growing:
     #--------------------------------------
         # will be set False in run()
         self.first_start = True
+
+    def get_area_from_map(self):
+        '''
+        The method to get area for analysis from map and put values to fields in user interface
+        '''
+
+        map = self.iface.mapCanvas().extent()
+
+        self.main_window.lineEdit.setText(str(map.yMaximum()))
+        self.main_window.lineEdit_2.setText(str(map.xMinimum()))
+        self.main_window.lineEdit_3.setText(str(map.xMaximum()))
+        self.main_window.lineEdit_4.setText(str(map.yMinimum()))
+        self.main_window.lineEdit_7.setText(str(map.xMinimum()))
+        self.main_window.lineEdit_8.setText(str(map.yMinimum()))
+        self.main_window.lineEdit_9.setText(str(map.xMaximum()))
+        self.main_window.lineEdit_10.setText(str(map.yMinimum()))
+        #self.main_window.show()
+
+
+
+
+
+    def download_landscape_image(self):
+        pass
+
+    def set_login_values(self,login,password):
+
+        self.main_window.mLineEdit.setText(password)
+        self.main_window.lineEdit_5.setText(login)
+
+
+    def save_login(self):
+        '''
+        Method to saving login data, for using to next downloading
+        '''
+        #self.login_variables = QSettings('Growing plugin ', 'Variables')
+        #self.set_login_values()
+
+
+        if (self.main_window.mLineEdit.text() != '') or (self.main_window.lineEdit_5.text() != '' ) :
+            self.login_variables.setValue('login_name',self.main_window.lineEdit_5.text())
+            self.login_variables.setValue('password',self.main_window.mLineEdit.text())
+            self.set_login_values(self.login_variables.value('login_name'), self.login_variables.value('password'))
+        elif  (self.main_window.mLineEdit.text() != self.login_variables.value('password')) \
+                or (self.main_window.lineEdit_5.text() != self.login_variables.value('login_name')):
+            self.login_variables.setValue('login_name', self.main_window.lineEdit_5.text())
+            self.login_variables.setValue('password', self.main_window.mLineEdit.text())
+            self.set_login_values(self.login_variables.value('login_name'), self.login_variables.value('password'))
+
+
+
+
+
+
+
+        # self.savePassword = self.main_window.mLineEdit.text()
+            # self.saveLogin = self.main_window.lineEdit_5.text()
+        # \
+        # or (self.main_window.mLineEdit.text() != self.login_variables.value('password')) \
+        #    or (self.main_window.lineEdit_5.text() != self.login_variables.value('login_name'))
+
+
+
+            #self.set_login_values()
+
+
+    def login_to_nasa_site(self):
+        '''
+        Method to connection with site earth.nasa.gov
+        '''
+
+        if (self.main_window.mLineEdit.text() == None) and (self.main_window.lineEdit_5.text() == None):
+            pass
+        elif (self.main_window.mLineEdit.text() == None) and (self.main_window.lineEdit_5.text() == None):
+            pass
+
+
+
+
+
+
+
+
+
+
+
+        pass
 
 
     def unload(self):
@@ -218,14 +312,37 @@ class Growing:
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
             self.first_start = False
-            self.dlg = GrowingDialog()
+            self.main_window = GrowingDialog()
+
+
 
         # show the dialog
-        self.dlg.show()
+        #self.main_window = GrowingDialog()
+
+
+        # self.main_window.checkBox.setChecked(True)
+        self.set_login_values(self.login_variables.value('login_name'),self.login_variables.value('password'))
+        self.main_window.show()
+
+        #self.main_window.exec_()
+        self.main_window.pushButton_2.clicked.connect(self.get_area_from_map)
+        self.main_window.checkBox.stateChanged.connect(self.save_login)
+        self.main_window.pushButton_3.clicked.connect(self.login_to_nasa_site)
+        # if self.main_window.checkBox.isChecked():
+        #
+        #     self.save_login()
+        #
+
+
+
+
+
+
         # Run the dialog event loop
-        result = self.dlg.exec_()
+        result = self.main_window.exec_()
+
         # See if OK was pressed
-        if result:
-            # Do something useful here - delete the line containing pass and
-            # substitute with your code.
-            pass
+        #if result:
+        # Do something useful here - delete the line containing pass and
+        # substitute with your code.
+        #pass
