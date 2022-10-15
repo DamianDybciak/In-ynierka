@@ -1,10 +1,17 @@
 <RCC>
-    <qresource prefix="growing" >
-        <file>/icons/main_icon.png</file>
-        <file>/icons/download.png</file>
-		<file>/icons/user_login.png</file>
-		<file>/icons/calendar.png</file>
-        
-    
+    <qresource prefix="growing">
+        <file>icons/main_icon.png</file>
+        <file>icons/download.png</file>
+		<file>icons/user_login.png</file>
+		<file>icons/calendar.png</file>
+        <file>icons/map_extent.png</file>
+        <file>icons/login9.png</file>
+		<file>icons/login.png</file>
+		<file>icons/login (1).png</file>
+        <file>icons/main_icon.png</file>
+        <file>icons/save_icon.png</file>
+		<file>icons/selection.png</file>
+		<file>icons/social-group.png</file>
     </qresource>
 </RCC>
+

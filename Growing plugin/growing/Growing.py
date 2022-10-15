@@ -21,16 +21,20 @@
  *                                                                         *
  ***************************************************************************/
 """
+import requests
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtWidgets import QAction, QPushButton
 
 # Initialize Qt resources from file resources.py
+
+#from .resources import *
 from .resources import *
 # Import the code for the dialog
+
 from .Growing_dialog import GrowingDialog
 import os.path
-import requests
+
 
 
 
@@ -51,6 +55,7 @@ class Growing:
         self.iface = iface
         # initialize plugin directory
         self.plugin_dir = os.path.dirname(__file__)
+        self.main_window = GrowingDialog()
         # initialize locale
         locale = QSettings().value('locale/userLocale')[0:2]
         locale_path = os.path.join(
@@ -71,8 +76,6 @@ class Growing:
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
 
-
-        # ===========================\
         self.savePassword = None
         self.saveLogin = None
         self.login_variables = QSettings('Growing plugin ', 'Variables')
@@ -94,16 +97,16 @@ class Growing:
 
 
     def add_action(
-        self,
-        icon_path,
-        text,
-        callback,
-        enabled_flag=True,
-        add_to_menu=True,
-        add_to_toolbar=True,
-        status_tip=None,
-        whats_this=None,
-        parent=None):
+            self,
+            icon_path,
+            text,
+            callback,
+            enabled_flag=True,
+            add_to_menu=True,
+            add_to_toolbar=True,
+            status_tip=None,
+            whats_this=None,
+            parent=None):
         """Add a toolbar icon to the toolbar.
 
         :param icon_path: Path to the icon for this action. Can be a resource
@@ -166,34 +169,15 @@ class Growing:
         self.actions.append(action)
 
         return action
-    #
-    # # ----------------------
-    # def download(self):
-    #     """
-    #     A method that allows you to get and display Modis data in the Qgis value window.
-    #     """
-    #     url = "https://developers.google.com/earth-engine/datasets/catalog/MODIS_006_MCD12Q2#description"
-    #
-    #     requests.get(url)
-    #
 
-
-    #------------------------
-
-
-    # ----------------------------
 
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
-        # icon_path = ':/plugins/Growing/icons/main_icon.png'
-        # self.add_action(
-        #     icon_path,
-        #     text=self.tr(u''),
-        #     callback=self.run,
-        #     parent=self.iface.mainWindow())
 
-    #---------------------------------  -----
+
+
+
 
         self.toolbar = self.iface.addToolBar(u'Growing toolbar')
         self.action = QAction(
@@ -204,7 +188,9 @@ class Growing:
         self.action.triggered.connect(self.run)
         self.iface.addToolBarIcon(self.action)
         self.iface.addPluginToMenu(u"&Growing", self.action)
-    #--------------------------------------
+
+
+
         # will be set False in run()
         self.first_start = True
 
@@ -230,12 +216,22 @@ class Growing:
 
 
     def download_landscape_image(self):
-        pass
+        password = self.main_window.mLineEdit
+        login = self.main_window.lineEdit_5.Text()
+   
+
+    def request_appeears(self):
+        product = 'MCD12Q2'
+        response = requests.get('https://appeears.earthdatacloud.nasa.gov/api/product/{0}'.format(product))
+
 
     def set_login_values(self,login,password):
 
         self.main_window.mLineEdit.setText(password)
         self.main_window.lineEdit_5.setText(login)
+
+
+
 
 
     def save_login(self):
@@ -305,7 +301,7 @@ class Growing:
             self.iface.removeToolBarIcon(action)
 
 
-    def run(self):
+    def  run(self):
         """Run method that performs all the real work"""
 
         # Create the dialog with elements (after translation) and keep reference
@@ -313,6 +309,21 @@ class Growing:
         if self.first_start == True:
             self.first_start = False
             self.main_window = GrowingDialog()
+
+        self.main_window.setWindowTitle("Growing")
+        self.main_window.setWindowIcon(QIcon(":/growing/icons/main_icon.png"))
+        self.main_window.widgets.setTabIcon(0, QIcon(':/growing/icons/social-group.png'))
+        self.main_window.widgets.setTabIcon(1, QIcon(':/growing/icons/map_extent.png'))
+        self.main_window.widgets.setTabIcon(2, QIcon(':/growing/icons/calendar.png'))
+        self.main_window.widgets.setTabIcon(3, QIcon(':/growing/icons/save_icon.png'))
+        self.main_window.pushButton_3.setIcon(QIcon(':/growing/icons/user_login.png'))
+        self.main_window.pushButton.setIcon(QIcon(':/growing/icons/download.png'))
+        self.main_window.pushButton_3.setIcon(QIcon(':/growing/icons/login (1).png'))
+        self.main_window.pushButton_2.setIcon(QIcon(':/growing/icons/selection.png'))
+
+
+
+
 
 
 
