@@ -25,6 +25,8 @@ import requests
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QPushButton
+from qgis.core import QgsMessageLog
+
 
 # Initialize Qt resources from file resources.py
 
@@ -274,11 +276,18 @@ class Growing:
         Method to connection with site earth.nasa.gov
         '''
 
-        if (self.main_window.mLineEdit.text() == None) and (self.main_window.lineEdit_5.text() == None):
-            pass
-        elif (self.main_window.mLineEdit.text() == None) and (self.main_window.lineEdit_5.text() == None):
-            pass
+        if (self.main_window.mLineEdit.text() == '') and (self.main_window.lineEdit_5.text() == ''):
+            QMessageBox.warning(None, "Ostrzerzenie", '     Brak danych logowania!     ') 
+        else:
+            appeears_request = requests.post('https://appeears.earthdatacloud.nasa.gov/api/login',auth=(self.main_window.lineEdit_5.text(),self.main_window.mLineEdit.text()))
+            
+            if appeears_request.status_code == 200:
+                auth_token =appeears_request.json()
+                QMessageBox.information(None, "Logowanie", '    Prawidłowe logowanie    ') 
 
+                
+            else:
+                QMessageBox.warning(None, "Ostrzerzenie", '     Nieprawidłowe dane logowania!     ') 
 
 
 
