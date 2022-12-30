@@ -12,6 +12,7 @@
         <file>icons/save_icon.png</file>
 		<file>icons/selection.png</file>
 		<file>icons/social-group.png</file>
+        <file>icons/make_chart.png</file>
     </qresource>
 </RCC>
 

@@ -21,23 +21,31 @@
  *                                                                         *
  ***************************************************************************/
 """
-import requests
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
-from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QPushButton
-from qgis.core import QgsMessageLog
-
-
 # Initialize Qt resources from file resources.py
 
-#from .resources import *
-from .resources import *
 # Import the code for the dialog
+import os.path
+import threading
+import time
+from datetime import datetime
+
+import requests
+from genericpath import isdir
+from qgis.core import QgsCoordinateReferenceSystem, QgsMapRendererJob, QgsMessageLog, QgsProject, QgsRasterLayer, QgsPoint, QgsRaster, QgsGeometry,QgsPointXY
+from qgis.gui import QgsMapTool, QgsMapToolEmitPoint, QgsMapToolAdvancedDigitizing
+from qgis import processing
+
+from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator, QTimer,QObject,Qt
+from qgis.PyQt.QtGui import QIcon, QCursor
+from qgis.PyQt.QtWidgets import QAction, QMessageBox, QPushButton
 
 from .Growing_dialog import GrowingDialog
-import os.path
+from .resources import *
+import numpy as np
+from qgis.analysis import QgsRasterCalculator, QgsRasterCalculatorEntry
 
-
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 
@@ -69,7 +77,7 @@ class Growing:
             self.translator = QTranslator()
             self.translator.load(locale_path)
             QCoreApplication.installTranslator(self.translator)
-
+          
         # Declare instance attributes
         self.actions = []
         self.menu = self.tr(u'&The growing seasion')
@@ -77,10 +85,31 @@ class Growing:
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
-
+        self.start_date = None
+        self.end_date = None 
+        self.range_of_years  = None 
         self.savePassword = None
         self.saveLogin = None
         self.login_variables = QSettings('Growing plugin ', 'Variables')
+        self.merge = None 
+        self.canvas = iface.mapCanvas()
+        self.pointTool = QgsMapToolEmitPoint(self.canvas)
+        
+
+        self.auth_token =  ''
+
+        self.task_settings =  {
+             "params": {"geo": {"type": "FeatureCollection", 
+            "features": [{"type": "Feature", "geometry": {"type": "Polygon",
+            "coordinates": None},
+            "properties": {}}], "fileName": "User-Drawn-Polygon"}, 
+            "dates": [{"endDate": None, "recurring": False, "startDate": None, "yearRange": [1950, 2010]}],
+            "layers": [{"layer": "MidGreenup", "product": "MCD12Q2.006"}, {"layer": "Greenup", "product": "MCD12Q2.006"}, 
+            {"layer": "Senescence", "product": "MCD12Q2.006"}], "output": {"format": {"type": "geotiff"}, "projection": "geographic"}},
+            "task_name": "",
+            "task_type": "area"
+            }
+
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -175,65 +204,129 @@ class Growing:
 
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
-
-
-
-
-
-
         self.toolbar = self.iface.addToolBar(u'Growing toolbar')
         self.action = QAction(
             QIcon(":/growing/icons/main_icon.png"),
             u"Growing",
             self.iface.mainWindow(),
         )
+        self.make_chart = QAction(
+            QIcon(":/growing/icons/make_chart.png"),
+            u"Make Chart",
+            
+        )
+        self.pointTool.canvasClicked.connect(self.get_point)
+        
         self.action.triggered.connect(self.run)
         self.iface.addToolBarIcon(self.action)
         self.iface.addPluginToMenu(u"&Growing", self.action)
+
+        self.make_chart.triggered.connect(self.make_a_chart)
+        self.iface.addToolBarIcon(self.make_chart)
+        self.iface.addPluginToMenu(u"&Growing", self.make_chart)
 
 
 
         # will be set False in run()
         self.first_start = True
 
+    def save_workspace_path(self):
+         
+        if self.main_window.mQgsFileWidget_2.filePath()!= '':
+            self.login_variables.setValue('path', self.main_window.mQgsFileWidget_2.filePath())
+        else:
+            self.main_window.mQgsFileWidget_2.setFilePath(self.login_variables.value('path'))
+       
+            
     def get_area_from_map(self):
         '''
         The method to get area for analysis from map and put values to fields in user interface
         '''
 
-        map = self.iface.mapCanvas().extent()
+
+        epsg = QgsCoordinateReferenceSystem(4326, QgsCoordinateReferenceSystem.PostgisCrsId)
+        map = self.iface.mapCanvas()
+        map.setDestinationCrs(epsg)
+        map = map.extent()
+        
+
+
 
         self.main_window.lineEdit.setText(str(map.yMaximum()))
         self.main_window.lineEdit_2.setText(str(map.xMinimum()))
-        self.main_window.lineEdit_3.setText(str(map.xMaximum()))
-        self.main_window.lineEdit_4.setText(str(map.yMinimum()))
-        self.main_window.lineEdit_7.setText(str(map.xMinimum()))
+        self.main_window.lineEdit_3.setText(str(map.yMaximum()))
+        self.main_window.lineEdit_4.setText(str(map.xMaximum()))
+        self.main_window.lineEdit_9.setText(str(map.yMinimum()))
+        self.main_window.lineEdit_10.setText(str(map.xMaximum()))
         self.main_window.lineEdit_8.setText(str(map.yMinimum()))
-        self.main_window.lineEdit_9.setText(str(map.xMaximum()))
-        self.main_window.lineEdit_10.setText(str(map.yMinimum()))
-        #self.main_window.show()
+        self.main_window.lineEdit_7.setText(str(map.xMinimum()))
 
 
-
-
-
+    def work_area_is_empty(self):
+        return (self.main_window.lineEdit.text() == "" or self.main_window.lineEdit_2.text() == "" or  self.main_window.lineEdit_3.text() == "" 
+            or self.main_window.lineEdit_4.text() == "" or self.main_window.lineEdit_7.text() == "" or self.main_window.lineEdit_8.text() == ""
+            or self.main_window.lineEdit_9.text() == "" or self.main_window.lineEdit_10.text() == "")
+           
+        
     def download_landscape_image(self):
         password = self.main_window.mLineEdit
-        login = self.main_window.lineEdit_5.Text()
-   
+        login = self.main_window.lineEdit_5.text()
+        folder = self.main_window.mQgsFileWidget_2.filePath()
+        
+        if self.work_area_is_empty():
+            QMessageBox.warning(None, "Ostrzerzenie", '     Nierawidłowy obszar do wykonania analizy!     ') 
 
-    def request_appeears(self):
-        product = 'MCD12Q2'
-        response = requests.get('https://appeears.earthdatacloud.nasa.gov/api/product/{0}'.format(product))
+        elif  isdir(folder) == False:
+             QMessageBox.warning(None, "Ostrzerzenie", '     Folder do zapisu danych nie istnieje!     ') 
+        else:
+            self.ordering_the_product()
 
 
+    def save_landscape_image(self,file_list,task_ID):
+        self.folder_path = self.main_window.mQgsFileWidget_2.filePath()
+
+
+        response = requests.get('https://appeears.earthdatacloud.nasa.gov/api/bundle/{}'.format(task_ID),\
+             headers={'Authorization': 'Bearer {}'.format(self.auth_token)}).json()
+ 
+        files = {}                                                       # Create empty dictionary
+        for f in response['files']: files[f['file_id']] = f['file_name']
+        for f in files:
+            dl = requests.get('https://appeears.earthdatacloud.nasa.gov/api/bundle/{}/{}'.format( task_ID, f), headers={'Authorization': 'Bearer {}'.format(self.auth_token)}, stream= True, allow_redirects = 'True')
+            if files[f].endswith('.tif'):
+                filename = files[f].split('/')[1]
+            else:
+                filename = files[f] 
+            filepath = os.path.join(self.folder_path, filename)                                                    
+            with open(filepath, 'wb') as f:                                                                  
+                for data in dl.iter_content(chunk_size=8192):
+                    f.write(data) 
+
+
+
+
+    
+    def add_layers_to_canvas(self,path):
+        list_of_files = os.listdir(self.folder_path)
+        for el in list_of_files:
+            path = os.path.join(self.folder_path,el)
+            path_elements = el.split('/')
+            layername = path_elements[len(path_elements)-1]
+            self.iface.addRasterLayer(path,layername)
+        
+    def task_status_request(self,task_ID):
+        start_request = time.time()
+        while requests.get('https://appeears.earthdatacloud.nasa.gov/api/task/{}'.format( task_ID),\
+            headers={'Authorization': 'Bearer {}'.format(self.auth_token)} ).json()['status'] != 'done':
+            time.sleep(20.0 - ((time.time() - start_request) % 20.0))
+        return requests.get('https://appeears.earthdatacloud.nasa.gov/api/task/{}'.format( task_ID),headers={'Authorization': 'Bearer {}'.format(self.auth_token)} ).json()['status']
+
+
+    
     def set_login_values(self,login,password):
-
+        'Method to set last used login data in login fields  '
         self.main_window.mLineEdit.setText(password)
         self.main_window.lineEdit_5.setText(login)
-
-
-
 
 
     def save_login(self):
@@ -247,28 +340,13 @@ class Growing:
         if (self.main_window.mLineEdit.text() != '') or (self.main_window.lineEdit_5.text() != '' ) :
             self.login_variables.setValue('login_name',self.main_window.lineEdit_5.text())
             self.login_variables.setValue('password',self.main_window.mLineEdit.text())
-            self.set_login_values(self.login_variables.value('login_name'), self.login_variables.value('password'))
+            # self.set_login_values(self.login_variables.value('login_name'), self.login_variables.value('password'))
         elif  (self.main_window.mLineEdit.text() != self.login_variables.value('password')) \
                 or (self.main_window.lineEdit_5.text() != self.login_variables.value('login_name')):
             self.login_variables.setValue('login_name', self.main_window.lineEdit_5.text())
             self.login_variables.setValue('password', self.main_window.mLineEdit.text())
-            self.set_login_values(self.login_variables.value('login_name'), self.login_variables.value('password'))
-
-
-
-
-
-
-
-        # self.savePassword = self.main_window.mLineEdit.text()
-            # self.saveLogin = self.main_window.lineEdit_5.text()
-        # \
-        # or (self.main_window.mLineEdit.text() != self.login_variables.value('password')) \
-        #    or (self.main_window.lineEdit_5.text() != self.login_variables.value('login_name'))
-
-
-
-            #self.set_login_values()
+            
+        self.set_login_values(self.login_variables.value('login_name'), self.login_variables.value('password'))
 
 
     def login_to_nasa_site(self):
@@ -276,30 +354,71 @@ class Growing:
         Method to connection with site earth.nasa.gov
         '''
 
+        
         if (self.main_window.mLineEdit.text() == '') and (self.main_window.lineEdit_5.text() == ''):
             QMessageBox.warning(None, "Ostrzerzenie", '     Brak danych logowania!     ') 
         else:
-            appeears_request = requests.post('https://appeears.earthdatacloud.nasa.gov/api/login',auth=(self.main_window.lineEdit_5.text(),self.main_window.mLineEdit.text()))
-            
-            if appeears_request.status_code == 200:
-                auth_token =appeears_request.json()
-                QMessageBox.information(None, "Logowanie", '    Prawidłowe logowanie    ') 
+            appeears_response = requests.post('https://appeears.earthdatacloud.nasa.gov/api/login',auth=(self.main_window.lineEdit_5.text(),self.main_window.mLineEdit.text()))
 
-                
+            '''
+                Used the POST method from requests library to connect with login site and get authorization token nessesary for future operations
+            '''
+            if appeears_response.status_code == 200:
+                QMessageBox.information(None, "Logowanie", '    Prawidłowe logowanie    ') 
+                self.auth_token = appeears_response.json()['token']    
             else:
                 QMessageBox.warning(None, "Ostrzerzenie", '     Nieprawidłowe dane logowania!     ') 
 
 
+    def set_coordinates(self):
+      
+        cords = [[[float(self.main_window.lineEdit_2.text()),float(self.main_window.lineEdit.text())],
+                [float(self.main_window.lineEdit_4.text()),float(self.main_window.lineEdit_3.text())],
+                [float(self.main_window.lineEdit_10.text()),float(self.main_window.lineEdit_9.text())],
+                [float(self.main_window.lineEdit_7.text()),float(self.main_window.lineEdit_8.text())]]]
+                
+
+        self.task_settings["params"]["geo"]["features"][0]["geometry"]['coordinates'] =  cords
+
+
+    def set_start_end_dates(self):
+    
+        start_date_elements = str(self.main_window.dateEdit.date().toPyDate()).split('-')
+        end_date_elements = str(self.main_window.dateEdit_2.date().toPyDate()).split('-')
+      
+        self.start_date = start_date_elements[2]+"-"+start_date_elements[1]+"-"+start_date_elements[0]
+        self.end_date = end_date_elements[2]+"-"+end_date_elements[1]+"-"+end_date_elements[0]
+        self.task_settings["params"]["dates"][0]["startDate"] =  self.start_date
+        self.task_settings["params"]["dates"][0]["endDate"] =  self.end_date
 
 
 
+    def ordering_the_product(self,start_date=None,end_date=None):
+        self.set_coordinates()
+        self.set_start_end_dates()
+        self.task_settings['task_name'] = 'Download_modis_{}'.format(datetime.today())
+
+        request_post_task = requests.post('https://appeears.earthdatacloud.nasa.gov/api/task',json=self.task_settings, 
+            headers={'Authorization': 'Bearer {}'.format(self.auth_token)})
+        task_response = request_post_task.json()
+        task_ID = task_response['task_id']
+
+        status = self.task_status_request(task_ID)
+        get_bundle_request = requests.get('https://appeears.earthdatacloud.nasa.gov/api/bundle/{}'.format(task_ID),
+        headers={'Authorization': 'Bearer {}'.format(self.auth_token)})
+        
+        bundle_response = get_bundle_request.json()
+        
+        self.save_landscape_image(bundle_response,task_ID)
+        self.add_layers_to_canvas(self.folder_path)
+
+        
 
 
-
-
-
-        pass
-
+    def checking_task_status(self,task_ID):
+        self.task_status = requests.get('https://appeears.earthdatacloud.nasa.gov/api/task/{}'.format( task_ID), headers={'Authorization': 'Bearer {}'.format(self.auth_token)} ).json()['status']
+        return self.task_status == 'done'
+            
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -309,10 +428,141 @@ class Growing:
                 action)
             self.iface.removeToolBarIcon(action)
 
+        
+    
+    def calculate_raster(self,raster_sentense,raster_greenup):
+
+        output_name_elements = raster_sentense.name()[:12]+"_"+ raster_sentense.name()[25:37] +'_raster_calc'
+        output = os.path.join(self.folder_path,output_name_elements)
+        entries = []
+
+        ras = QgsRasterCalculatorEntry()
+        ras.ref = 'ras@1' 
+        ras.raster = raster_sentense
+        ras.bandNumber = 1
+        entries.append(ras)
+
+
+        ras = QgsRasterCalculatorEntry()
+        ras.ref = 'ras@2'
+        ras.raster = raster_greenup
+        ras.bandNumber = 1
+        entries.append(ras)
+
+        calc = QgsRasterCalculator('ras@1 - ras@2', output, 'GTiff', \
+        raster_sentense.extent(), raster_sentense.width(), raster_sentense.height(), entries)
+        calc.processCalculation()
+
+        layer_sum = QgsRasterLayer(output,output)
+
+        QgsProject.instance().addMapLayer(layer_sum)
+        return layer_sum
+
+    
+    def merge_raster(self,list_of_calculated_raster):
+        
+        outputfile_path = os.path.join(self.folder_path,'growing_merge_raster.tif' )
+
+
+        processing.run("gdal:merge", { 'DATA_TYPE' : 5, 'EXTRA' : '', 
+        'INPUT' : list_of_calculated_raster,
+                'NODATA_INPUT' : None, 'NODATA_OUTPUT' : None, 'OPTIONS' : '', 
+                'OUTPUT' : outputfile_path, 'PCT' : False, 'SEPARATE' : True })
+        QgsProject.instance().addMapLayer(QgsRasterLayer(outputfile_path,outputfile_path))
+        return QgsRasterLayer(outputfile_path,outputfile_path)
+
+
+        
+    
+    def make_plot(self,growing_values):
+        # data to be plotted
+        x = np.arange( 1,(self.merge.bandCount()+1))
+        y = growing_values
+        plt.close()
+        plt.title("The growing season")
+        plt.xlabel("Range of years ")
+        plt.ylabel("Length of the growing season")
+        plt.plot(x, y, color ="cyan")
+
+        plt.show()
+
+    def need_raster_calculator(self,layers_list):
+        for layer_name in layers_list:
+            if 'raster_calc'  in layer_name.name():
+                return False
+        return True
+
+    def get_point(self,point):
+        try:
+            xY = [point.x(),point.y()]
+            return xY
+        except AttributeError:
+            pass
+
+    def layer_existed(self,layer_name):
+        all_layers = self.iface.mapCanvas().layers()
+        for lrs in all_layers:
+            if layer_name  in lrs.name():
+                return True 
+
+
+
+    def identify_point(self,pointTool):
+        self.years_values = []
+        cords = self.get_point(pointTool)
+        self.main_window.lineEdit_9.setText(str(cords))
+
+        x,y = cords[0],cords[1]
+        point = QgsPoint(float(x),float(y))
+        number_of_bands = self.merge.bandCount()
+        
+        if self.layer_existed(self.merge.name()):
+            
+            for band  in range(1,number_of_bands+1):
+                self.years_values.append(self.merge.dataProvider().sample(QgsPointXY(x, y),band)[0])
+        # else: 
+        # self.x = self.merge.dataProvider().identify(QgsPointXY(x, y), QgsRaster.IdentifyFormatValue) 
+            # self.main_window.lineEdit_10.setText(str(list(self.years_values)))
+        self.make_plot(self.years_values)
+
+
+    def make_a_chart(self):
+        self.folder_path = self.main_window.mQgsFileWidget_2.filePath()
+        layers = self.iface.mapCanvas().layers()
+        epsg = QgsCoordinateReferenceSystem(4326, QgsCoordinateReferenceSystem.PostgisCrsId)
+
+        map = self.iface.mapCanvas()
+        map.setDestinationCrs(epsg)
+        map = map.extent()
+        calculated_layers = []
+        if self.need_raster_calculator(layers):
+            
+            for layer in layers:
+                for l in layers:
+                    if 'Senescence_0'  in layer.name():
+                        if ('Greenup_0'  in l.name()):
+                            if layer.name()[28:35] == l.name()[25:32] :
+                                calculated_layers.append(self.calculate_raster(layer,l))
+        else: 
+            for layer_name in layers:
+                if 'raster_calc'  in layer_name.name():
+                    calculated_layers.append(layer_name.name())
+        
+
+        
+        self.merge = self.merge_raster(calculated_layers) 
+
+        canvas = self.iface.mapCanvas()
+        self.previousTool = canvas.mapTool()
+        self.pointTool = QgsMapToolEmitPoint(canvas)
+        self.pointTool.canvasClicked.connect(self.identify_point)
+        canvas.setMapTool(self.pointTool)
+        # self.identify_point(self.pointTool)
+
+
 
     def  run(self):
         """Run method that performs all the real work"""
-
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
@@ -330,12 +580,6 @@ class Growing:
         self.main_window.pushButton_3.setIcon(QIcon(':/growing/icons/login (1).png'))
         self.main_window.pushButton_2.setIcon(QIcon(':/growing/icons/selection.png'))
 
-
-
-
-
-
-
         # show the dialog
         #self.main_window = GrowingDialog()
 
@@ -348,15 +592,8 @@ class Growing:
         self.main_window.pushButton_2.clicked.connect(self.get_area_from_map)
         self.main_window.checkBox.stateChanged.connect(self.save_login)
         self.main_window.pushButton_3.clicked.connect(self.login_to_nasa_site)
-        # if self.main_window.checkBox.isChecked():
-        #
-        #     self.save_login()
-        #
-
-
-
-
-
+        self.main_window.pushButton.clicked.connect(self.download_landscape_image)
+        self.save_workspace_path()
 
         # Run the dialog event loop
         result = self.main_window.exec_()
